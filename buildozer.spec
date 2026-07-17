@@ -14,7 +14,7 @@ version = 1.0
 entrypoint = main.py
 
 # Dependensi Python
-requirements = python3,kivy==2.2.1,requests,websocket-client,certifi,charset-normalizer,idna,urllib3,plyer
+requirements = python3,kivy,requests,websocket-client,plyer
 
 # Orientasi
 orientation = portrait
