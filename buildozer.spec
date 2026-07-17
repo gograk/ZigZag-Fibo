@@ -22,11 +22,14 @@ orientation = portrait
 # Android permission
 android.permissions = INTERNET,FOREGROUND_SERVICE,RECEIVE_BOOT_COMPLETED,VIBRATE,POST_NOTIFICATIONS
 
-# Minimum Android SDK
+# Android SDK / NDK
 android.minapi = 21
 android.api = 33
+android.sdk = 33
 android.ndk = 25b
 android.ndk_api = 21
+android.build_tools_version = 34.0.0
+android.accept_sdk_license = True
 
 # NDK
 android.archs = arm64-v8a, armeabi-v7a
