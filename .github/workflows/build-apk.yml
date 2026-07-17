@@ -34,24 +34,31 @@ jobs:
             cmake libffi-dev libssl-dev build-essential \
             ccache
 
-      - name: Setup Android SDK (gunakan yang sudah ada di runner)
+      - name: Patch Android SDK untuk buildozer
         run: |
-          # GitHub Actions sudah punya Android SDK di sini
-          PREINSTALLED_SDK=/usr/local/lib/android/sdk
-          echo "ANDROID_SDK_ROOT=$PREINSTALLED_SDK" >> $GITHUB_ENV
+          SDK=/usr/local/lib/android/sdk
+          NEW_SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
 
-          # Install build-tools;34.0.0 yang mengandung aidl
-          yes | $PREINSTALLED_SDK/cmdline-tools/latest/bin/sdkmanager \
-            "build-tools;34.0.0" \
-            "platforms;android-33" 2>/dev/null || true
+          # Install build-tools (mengandung aidl) dan platform android-33
+          yes | "$NEW_SDKMANAGER" "build-tools;34.0.0" "platforms;android-33" 2>/dev/null || true
 
-          # Buildozer expects SDK di ~/.buildozer/android/platform/android-sdk
+          # Buildozer hardcode cari sdkmanager di tools/bin/ (path lama)
+          # Buat wrapper shell script di path lama (tanpa heredoc agar tidak masalah indentasi YAML)
+          sudo mkdir -p "$SDK/tools/bin"
+          printf '#!/bin/bash\nexec /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "$@"\n' \
+            | sudo tee "$SDK/tools/bin/sdkmanager" > /dev/null
+          sudo chmod +x "$SDK/tools/bin/sdkmanager"
+
+          # Verifikasi wrapper bekerja
+          "$SDK/tools/bin/sdkmanager" --version
+
+          # Symlink supaya buildozer menemukan SDK di path defaultnya
           mkdir -p ~/.buildozer/android/platform
-          ln -sf $PREINSTALLED_SDK ~/.buildozer/android/platform/android-sdk
+          ln -sf "$SDK" ~/.buildozer/android/platform/android-sdk
 
-          # Verifikasi aidl ada
-          ls $PREINSTALLED_SDK/build-tools/34.0.0/aidl || \
-            ls $PREINSTALLED_SDK/build-tools/*/aidl | head -1
+          # Export
+          echo "ANDROID_SDK_ROOT=$SDK" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$SDK"     >> $GITHUB_ENV
 
       - name: Cache buildozer NDK & packages
         uses: actions/cache@v4
@@ -60,9 +67,9 @@ jobs:
             ~/.buildozer/android/platform/android-ndk*
             ~/.buildozer/packages
             ~/.gradle
-          key: buildozer-ndk-${{ runner.os }}-v3-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-ndk-${{ runner.os }}-v5-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
-            buildozer-ndk-${{ runner.os }}-v3-
+            buildozer-ndk-${{ runner.os }}-v5-
 
       - name: Install buildozer + Cython
         run: |
@@ -70,10 +77,10 @@ jobs:
           pip install buildozer==1.5.0 cython==3.0.12
 
       - name: Build APK
-        run: |
-          buildozer android debug
+        run: buildozer android debug
         env:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
