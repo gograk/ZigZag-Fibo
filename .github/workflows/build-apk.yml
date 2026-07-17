@@ -7,30 +7,68 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Cache buildozer
+      # ── Java (no PPA — avoids the openjdk-r/ppa "Release file" error) ──
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ── Python ───────────────────────────────────────────────────────────
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # ── System dependencies required by buildozer / p4a ──────────────────
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            git zip unzip autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 cmake \
+            libffi-dev libssl-dev build-essential \
+            ccache lld
+
+      # ── Cache buildozer global dir and Gradle ────────────────────────────
+      - name: Cache buildozer & gradle
         uses: actions/cache@v4
         with:
           path: |
             ~/.buildozer
             ~/.gradle
-          key: buildozer-action-${{ runner.os }}-v1-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-${{ runner.os }}-py310-${{ hashFiles('buildozer.spec') }}
           restore-keys: |
-            buildozer-action-${{ runner.os }}-v1-
+            buildozer-${{ runner.os }}-py310-
 
-      - name: Build APK (via buildozer-action)
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
-        with:
-          command: buildozer android debug
-          workdir: .
-          buildozer_version: stable
+      # ── Install buildozer and Cython via pip (no Docker involved) ─────────
+      - name: Install buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
 
+      # ── Accept Android SDK licenses non-interactively ────────────────────
+      - name: Accept Android SDK licenses
+        run: |
+          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
+          echo -e "\n24333f8a63b6825ea9c5514f83c2829b004d1fee" \
+            > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
+          echo -e "\nd56f5187479451eabf01fb78af6dfcb131a6481e" \
+            > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+
+      # ── Build ─────────────────────────────────────────────────────────────
+      - name: Build APK
+        run: buildozer android debug
+        env:
+          ANDROID_SDK_ROOT: ${{ env.HOME }}/.buildozer/android/platform/android-sdk
+
+      # ── Upload artifact ───────────────────────────────────────────────────
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
