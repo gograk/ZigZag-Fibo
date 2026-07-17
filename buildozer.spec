@@ -25,7 +25,6 @@ android.permissions = INTERNET,FOREGROUND_SERVICE,RECEIVE_BOOT_COMPLETED,VIBRATE
 # Android SDK / NDK
 android.minapi = 21
 android.api = 33
-android.sdk = 33
 android.ndk = 25b
 android.ndk_api = 21
 android.build_tools_version = 34.0.0
